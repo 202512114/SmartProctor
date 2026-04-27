@@ -1,7 +1,7 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "PACK"
   },
   "deploy": {
     "startCommand": ". /opt/venv/bin/activate && cd backend && gunicorn --bind 0.0.0.0:$PORT app:app",
