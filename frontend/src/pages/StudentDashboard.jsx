@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE_URL } from '../config'
 import {
     ClipboardList,
     Users,
@@ -53,7 +54,7 @@ export default function StudentDashboard() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/student-dashboard/summary', {
+            const res = await fetch(`${API_BASE_URL}/api/student-dashboard/summary`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

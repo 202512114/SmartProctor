@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Settings, Plus, Edit, Trash, Save } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 const emptyQuestion = () => ({
     question_text: '',
@@ -55,7 +56,7 @@ export default function ExamManagement() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/exams', {
+            const res = await fetch(`${API_BASE_URL}/api/exams`, {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
@@ -185,8 +186,8 @@ export default function ExamManagement() {
             }
 
             const url = editId
-                ? `http://localhost:5000/api/exams/${editId}`
-                : 'http://localhost:5000/api/exams'
+                ? `${API_BASE_URL}/api/exams/${editId}`
+                : `${API_BASE_URL}/api/exams`
 
             const method = editId ? 'PUT' : 'POST'
 
@@ -228,7 +229,7 @@ export default function ExamManagement() {
             setError('')
             const token = localStorage.getItem('token')
 
-            const res = await fetch(`http://localhost:5000/api/exams/${examId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/exams/${examId}`, {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
@@ -273,7 +274,7 @@ export default function ExamManagement() {
             setError('')
             const token = localStorage.getItem('token')
 
-            const res = await fetch(`http://localhost:5000/api/exams/${examId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/exams/${examId}`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`

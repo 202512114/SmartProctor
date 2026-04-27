@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config'
 
 export default function Profile() {
     const navigate = useNavigate()
@@ -47,7 +48,7 @@ export default function Profile() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/profile', {
+            const res = await fetch(`${API_BASE_URL}/api/profile`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ export default function Profile() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/profile', {
+            const res = await fetch(`${API_BASE_URL}/api/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

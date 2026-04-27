@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../App'
 import { Lock, Rocket } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 export default function Login() {
     const { login } = useAuth()
@@ -20,8 +21,8 @@ export default function Login() {
             const isLogin = mode === "login"
 
             const url = isLogin
-                ? "http://localhost:5000/api/auth/login"
-                : "http://localhost:5000/api/auth/register"
+                ? `${API_BASE_URL}/api/auth/login`
+                : `${API_BASE_URL}/api/auth/register`
 
             const payload = isLogin
                 ? { email, password, selectedRole: role }

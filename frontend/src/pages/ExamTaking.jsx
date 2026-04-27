@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as faceapi from 'face-api.js'
 import { useParams, useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config'
 import {
     Clock,
     AlertTriangle,
@@ -51,7 +52,7 @@ export default function ExamTaking() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch(`http://localhost:5000/api/exam-list/${examId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/exam-list/${examId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ export default function ExamTaking() {
         try {
             const token = localStorage.getItem('token')
 
-            await fetch(`http://localhost:5000/api/exam-list/${examId}/warning`, {
+            await fetch(`${API_BASE_URL}/api/exam-list/${examId}/warning`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -271,7 +272,7 @@ export default function ExamTaking() {
                 selected_option: answers[index] || ''
             }))
 
-            const res = await fetch(`http://localhost:5000/api/exam-list/${examId}/submit`, {
+            const res = await fetch(`${API_BASE_URL}/api/exam-list/${examId}/submit`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

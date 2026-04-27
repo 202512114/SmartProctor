@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Users, Trash } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 export default function StudentManagement() {
     const [studentList, setStudentList] = useState([])
@@ -17,7 +18,7 @@ export default function StudentManagement() {
             setError('')
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/students', {
+            const res = await fetch(`${API_BASE_URL}/api/students`, {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
@@ -49,7 +50,7 @@ export default function StudentManagement() {
             setSaveMessage('')
             const token = localStorage.getItem('token')
 
-            const res = await fetch(`http://localhost:5000/api/students/${studentId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/students/${studentId}`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`

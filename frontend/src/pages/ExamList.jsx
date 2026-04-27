@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, FileText, Rocket, Lock, BarChart, Calendar, Clock, XCircle } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 export default function ExamList() {
     const [filter, setFilter] = useState('all')
@@ -21,7 +22,7 @@ export default function ExamList() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch('http://localhost:5000/api/exam-list', {
+            const res = await fetch(`${API_BASE_URL}/api/exam-list`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -53,7 +54,7 @@ export default function ExamList() {
 
             const token = localStorage.getItem('token')
 
-            const res = await fetch(`http://localhost:5000/api/exam-list/${examId}/result`, {
+            const res = await fetch(`${API_BASE_URL}/api/exam-list/${examId}/result`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

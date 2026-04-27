@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { CheckCircle, AlertTriangle, ClipboardList, Users, BarChart } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 export default function AdminDashboard() {
     const [dashboardStats, setDashboardStats] = useState({
@@ -27,19 +28,19 @@ export default function AdminDashboard() {
             const token = localStorage.getItem('token')
 
             const [statsRes, activityRes, resultsRes] = await Promise.all([
-                fetch('http://localhost:5000/api/dashboard/stats', {
+                fetch(`${API_BASE_URL}/api/dashboard/stats`, {
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`
                     }
                 }),
-                fetch('http://localhost:5000/api/dashboard/activity', {
+                fetch(`${API_BASE_URL}/api/dashboard/activity`, {
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`
                     }
                 }),
-                fetch('http://localhost:5000/api/dashboard/recent-results', {
+                fetch(`${API_BASE_URL}/api/dashboard/recent-results`, {
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`

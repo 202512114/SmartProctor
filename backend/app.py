@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request
 from flask_pymongo import PyMongo
 from flask_cors import CORS
@@ -13,15 +17,22 @@ from StudentDashboard import student_dashboard_bp
 
 app = Flask(__name__)
 
-app.config["MONGO_URI"] = "mongodb://localhost:27017/smartproctor"
-app.config["SECRET_KEY"] = "mysecretkey"
+app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb://localhost:27017/smartproctor")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mysecretkey")
 
 mongo = PyMongo(app)
 app.mongo = mongo
 
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    FRONTEND_URL,
+]
+
 CORS(
     app,
-    resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173"]}},
+    resources={r"/api/*": {"origins": ALLOWED_ORIGINS}},
     supports_credentials=True
 )
 
@@ -29,7 +40,7 @@ CORS(
 def after_request(response):
     origin = request.headers.get("Origin")
 
-    if origin in ["http://localhost:3000", "http://localhost:5173"]:
+    if origin in ALLOWED_ORIGINS:
         response.headers["Access-Control-Allow-Origin"] = origin
     else:
         response.headers["Access-Control-Allow-Origin"] = "*"
