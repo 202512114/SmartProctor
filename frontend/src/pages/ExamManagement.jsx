@@ -33,19 +33,33 @@ export default function ExamManagement() {
         fetchExams()
     }, [])
 
-    const formatDateTimeForInput = (dateString) => {
-        if (!dateString) return ''
-        const d = new Date(dateString)
-        if (isNaN(d.getTime())) return ''
-        const pad = (n) => String(n).padStart(2, '0')
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    // "2026-04-27T16:00" (admin typed IST wall clock) -> "2026-04-27T10:30:00.000Z"
+    const istLocalToUtcIso = (s) => {
+        if (!s) return ''
+        const [d, t] = s.split('T')
+        if (!d || !t) return ''
+        const time = t.length === 5 ? `${t}:00` : t
+        const dt = new Date(`${d}T${time}+05:30`)
+        if (isNaN(dt.getTime())) return ''
+        return dt.toISOString()
     }
+
+    // UTC ISO from API -> "YYYY-MM-DDTHH:mm" suitable for <input type="datetime-local"> in IST
+    const utcIsoToIstLocal = (iso) => {
+        if (!iso) return ''
+        const d = new Date(iso)
+        if (isNaN(d.getTime())) return ''
+        const ms = d.getTime() + 5.5 * 60 * 60 * 1000
+        return new Date(ms).toISOString().slice(0, 16)
+    }
+
+    const formatDateTimeForInput = (dateString) => utcIsoToIstLocal(dateString)
 
     const formatDisplayDate = (dateString) => {
         if (!dateString) return '-'
         const d = new Date(dateString)
         if (isNaN(d.getTime())) return dateString
-        return d.toLocaleString()
+        return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST'
     }
 
     const fetchExams = async () => {
@@ -168,11 +182,17 @@ export default function ExamManagement() {
                 return
             }
 
+            const scheduledAtUtc = istLocalToUtcIso(form.scheduled_at)
+            if (!scheduledAtUtc) {
+                setError('Invalid scheduled date/time')
+                return
+            }
+
             const payload = {
                 title: form.title.trim(),
                 subject: form.subject.trim(),
                 duration_minutes: parseInt(form.duration_minutes, 10),
-                scheduled_at: form.scheduled_at,
+                scheduled_at: scheduledAtUtc,
                 total_marks: calculateTotalMarks(),
                 questions: form.questions.map((q) => ({
                     question_text: q.question_text.trim(),

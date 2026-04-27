@@ -1,8 +1,14 @@
 from flask import Blueprint, jsonify, current_app, request
 from utils import token_required
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 exams_bp = Blueprint("exams", __name__)
+
+try:
+    IST = ZoneInfo("Asia/Kolkata")
+except ZoneInfoNotFoundError:
+    IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def parse_datetime(value):
@@ -10,10 +16,20 @@ def parse_datetime(value):
         return None
 
     if isinstance(value, datetime):
-        return value
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    s = str(value).strip()
+    if not s:
+        return None
 
     try:
-        return datetime.fromisoformat(str(value).replace("Z", ""))
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            # Legacy naive value -> interpret as IST wall clock, normalize to UTC
+            return dt.replace(tzinfo=IST).astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
         return None
 
@@ -41,23 +57,38 @@ def get_exam_status(scheduled_at, duration_minutes):
     start_time = parse_datetime(scheduled_at)
 
     if not start_time:
-        return "upcoming"
+        return "upcoming", None, None
 
     try:
         duration = int(duration_minutes)
     except Exception:
         duration = 30
 
+    if duration <= 0:
+        duration = 30
+
     end_time = start_time + timedelta(minutes=duration)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if now < start_time:
-        return "upcoming"
+        status = "upcoming"
+    elif start_time <= now <= end_time:
+        status = "live"
+    else:
+        status = "completed"
 
-    if start_time <= now <= end_time:
-        return "live"
+    try:
+        current_app.logger.info(
+            "EXAM_STATUS now=%s start=%s end=%s status=%s",
+            now.isoformat(),
+            start_time.isoformat(),
+            end_time.isoformat(),
+            status,
+        )
+    except Exception:
+        pass
 
-    return "completed"
+    return status, start_time, end_time
 
 
 def calculate_grade(percentage):
@@ -138,7 +169,7 @@ def get_or_create_attempt(db, exam_id, student_id):
 def format_exam(db, exam, student_id):
     exam_id = exam.get("exam_id", "")
 
-    status = get_exam_status(
+    status, start_time, end_time = get_exam_status(
         exam.get("scheduled_at"),
         exam.get("duration_minutes", 0)
     )
@@ -150,13 +181,24 @@ def format_exam(db, exam, student_id):
 
     display_status = "completed" if result else status
 
-    scheduled_at = parse_datetime(exam.get("scheduled_at"))
     question_count = db.questions.count_documents({"exam_id": exam_id})
     total_marks = int(exam.get("total_marks", 0) or 0)
 
     db.exams.update_one(
         {"exam_id": exam_id},
         {"$set": {"status": status}}
+    )
+
+    scheduled_at_iso = (
+        start_time.isoformat().replace("+00:00", "Z") if start_time else None
+    )
+    ends_at_iso = (
+        end_time.isoformat().replace("+00:00", "Z") if end_time else None
+    )
+    date_display = (
+        start_time.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+        if start_time
+        else "Not scheduled"
     )
 
     return {
@@ -167,7 +209,9 @@ def format_exam(db, exam, student_id):
         "duration": exam.get("duration_minutes", 0),
         "totalMarks": total_marks,
         "passingMarks": max(1, int(total_marks * 0.4)),
-        "date": scheduled_at.strftime("%d %b %Y, %I:%M %p") if scheduled_at else "Not scheduled",
+        "date": date_display,
+        "scheduledAt": scheduled_at_iso,
+        "endsAt": ends_at_iso,
         "status": display_status,
         "hasResult": bool(result)
     }
@@ -188,7 +232,7 @@ def get_exams():
         for exam in exam_docs:
             exams.append(format_exam(db, exam, student_id))
 
-        exams.sort(key=lambda x: x["date"])
+        exams.sort(key=lambda x: x.get("scheduledAt") or "")
 
         return jsonify({"exams": exams}), 200
 
@@ -218,7 +262,7 @@ def get_exam_details(exam_id):
         if existing_result:
             return jsonify({"message": "You have already completed this exam"}), 403
 
-        status = get_exam_status(
+        status, _start, _end = get_exam_status(
             exam.get("scheduled_at"),
             exam.get("duration_minutes", 0)
         )

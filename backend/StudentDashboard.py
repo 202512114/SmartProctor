@@ -1,8 +1,14 @@
 from flask import Blueprint, jsonify, request, current_app
 from utils import token_required
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 student_dashboard_bp = Blueprint("student_dashboard_bp", __name__)
+
+try:
+    IST = ZoneInfo("Asia/Kolkata")
+except ZoneInfoNotFoundError:
+    IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def parse_datetime(value):
@@ -10,10 +16,20 @@ def parse_datetime(value):
         return None
 
     if isinstance(value, datetime):
-        return value
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    s = str(value).strip()
+    if not s:
+        return None
 
     try:
-        return datetime.fromisoformat(str(value).replace("Z", ""))
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            # Legacy naive value -> interpret as IST wall clock, normalize to UTC
+            return dt.replace(tzinfo=IST).astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
         return None
 
@@ -22,23 +38,38 @@ def get_exam_status(scheduled_at, duration_minutes):
     start_time = parse_datetime(scheduled_at)
 
     if not start_time:
-        return "upcoming"
+        return "upcoming", None, None
 
     try:
         duration = int(duration_minutes)
     except Exception:
         duration = 30
 
+    if duration <= 0:
+        duration = 30
+
     end_time = start_time + timedelta(minutes=duration)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if now < start_time:
-        return "upcoming"
+        status = "upcoming"
+    elif start_time <= now <= end_time:
+        status = "live"
+    else:
+        status = "completed"
 
-    if start_time <= now <= end_time:
-        return "live"
+    try:
+        current_app.logger.info(
+            "EXAM_STATUS now=%s start=%s end=%s status=%s",
+            now.isoformat(),
+            start_time.isoformat(),
+            end_time.isoformat(),
+            status,
+        )
+    except Exception:
+        pass
 
-    return "completed"
+    return status, start_time, end_time
 
 
 def get_logged_student(db, current_user):
@@ -96,7 +127,8 @@ def is_today(value):
     if not dt:
         return False
 
-    return dt.date() == datetime.utcnow().date()
+    today_ist = datetime.now(timezone.utc).astimezone(IST).date()
+    return dt.astimezone(IST).date() == today_ist
 
 
 def format_time(value):
@@ -105,7 +137,7 @@ def format_time(value):
     if not dt:
         return "Not scheduled"
 
-    return dt.strftime("%I:%M %p")
+    return dt.astimezone(IST).strftime("%I:%M %p IST")
 
 
 def format_date_time(value):
@@ -114,7 +146,7 @@ def format_date_time(value):
     if not dt:
         return str(value or "")
 
-    return dt.strftime("%d %b %Y, %I:%M %p")
+    return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
 
 
 def get_total_marks(db, exam_id, exam):
@@ -138,11 +170,12 @@ def get_today_logs_for_attempts(db, attempt_ids):
     )
 
     today_logs = []
+    today_ist = datetime.now(timezone.utc).astimezone(IST).date()
 
     for log in logs:
         detected_at = parse_datetime(log.get("detected_at"))
 
-        if detected_at and detected_at.date() == datetime.utcnow().date():
+        if detected_at and detected_at.astimezone(IST).date() == today_ist:
             today_logs.append(log)
 
     return today_logs
@@ -168,7 +201,7 @@ def get_student_dashboard_summary():
 
             exam_id = exam.get("exam_id")
 
-            actual_status = get_exam_status(
+            actual_status, start_time, end_time = get_exam_status(
                 scheduled_at,
                 exam.get("duration_minutes", 0)
             )
@@ -192,9 +225,19 @@ def get_student_dashboard_summary():
                 "questions": db.questions.count_documents({"exam_id": exam_id}),
                 "duration": exam.get("duration_minutes", 0),
                 "time": format_time(scheduled_at),
+                "scheduledAt": (
+                    start_time.isoformat().replace("+00:00", "Z")
+                    if start_time
+                    else None
+                ),
+                "endsAt": (
+                    end_time.isoformat().replace("+00:00", "Z")
+                    if end_time
+                    else None
+                ),
                 "status": display_status,
                 "hasResult": bool(result),
-                "scheduledSort": parse_datetime(scheduled_at) or datetime.max
+                "scheduledSort": start_time or datetime.max.replace(tzinfo=timezone.utc)
             })
 
         today_exams.sort(key=lambda e: e["scheduledSort"])
@@ -237,7 +280,11 @@ def get_student_dashboard_summary():
                 "type": log.get("event_type", "warning"),
                 "message": log.get("event_type", "Warning detected").replace("_", " ").title(),
                 "severity": log.get("severity", "medium").title(),
-                "time": detected.strftime("%I:%M %p") if detected else str(log.get("detected_at", ""))
+                "time": (
+                    detected.astimezone(IST).strftime("%I:%M %p IST")
+                    if detected
+                    else str(log.get("detected_at", ""))
+                )
             })
 
         recent_results = []

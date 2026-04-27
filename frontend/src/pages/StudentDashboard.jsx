@@ -16,6 +16,32 @@ import {
     Clock
 } from '../components/Icons'
 
+const computeStatus = (e) => {
+    const fromBackend = String(e?.status || '').toLowerCase()
+    if (e?.hasResult) return 'completed'
+    if (!e?.scheduledAt || !e?.endsAt) return fromBackend || 'upcoming'
+
+    const now = Date.now()
+    const start = new Date(e.scheduledAt).getTime()
+    const end = new Date(e.endsAt).getTime()
+
+    if (Number.isNaN(start) || Number.isNaN(end)) return fromBackend || 'upcoming'
+
+    const computed = now < start ? 'upcoming' : now <= end ? 'live' : 'completed'
+
+    if (import.meta.env.DEV || (typeof window !== 'undefined' && window.localStorage?.getItem('debugExamTime') === '1')) {
+        console.log('[Dashboard]', e.id, {
+            now: new Date(now).toISOString(),
+            start: e.scheduledAt,
+            end: e.endsAt,
+            computed,
+            fromBackend
+        })
+    }
+
+    return computed
+}
+
 export default function StudentDashboard() {
     const [dashboard, setDashboard] = useState({
         studentName: 'Student',
@@ -34,6 +60,12 @@ export default function StudentDashboard() {
 
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [, setTick] = useState(0)
+
+    useEffect(() => {
+        const id = setInterval(() => setTick((t) => t + 1), 30_000)
+        return () => clearInterval(id)
+    }, [])
 
     const alertIcons = {
         multiple_faces: <Users size={16} />,
@@ -93,6 +125,13 @@ export default function StudentDashboard() {
         )
     }
 
+    const todayExamsWithStatus = (dashboard.todayExams || []).map((exam) => ({
+        ...exam,
+        status: computeStatus(exam)
+    }))
+
+    const liveCount = todayExamsWithStatus.filter((e) => e.status === 'live').length
+
     return (
         <div className="animate-slide-up">
             <div className="page-header">
@@ -122,7 +161,7 @@ export default function StudentDashboard() {
                         <Rocket size={22} color="var(--accent-green)" />
                     </div>
                     <div className="stat-info">
-                        <h3>{dashboard.stats.liveExams}</h3>
+                        <h3>{liveCount}</h3>
                         <p>Live Exams</p>
                     </div>
                 </div>
@@ -173,12 +212,12 @@ export default function StudentDashboard() {
                         </Link>
                     </div>
 
-                    {dashboard.todayExams.length === 0 ? (
+                    {todayExamsWithStatus.length === 0 ? (
                         <div style={{ padding: '14px 0', color: 'var(--text-muted)', fontSize: 14 }}>
                             No exams scheduled for today.
                         </div>
                     ) : (
-                        dashboard.todayExams.map(exam => (
+                        todayExamsWithStatus.map(exam => (
                             <div
                                 key={exam.id}
                                 style={{

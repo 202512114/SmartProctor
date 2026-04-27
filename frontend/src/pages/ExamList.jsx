@@ -3,6 +3,32 @@ import { Link } from 'react-router-dom'
 import { Search, FileText, Rocket, Lock, BarChart, Calendar, Clock, XCircle } from '../components/Icons'
 import { API_BASE_URL } from '../config'
 
+const computeStatus = (e) => {
+    const fromBackend = String(e?.status || '').toLowerCase()
+    if (e?.hasResult) return 'completed'
+    if (!e?.scheduledAt || !e?.endsAt) return fromBackend || 'upcoming'
+
+    const now = Date.now()
+    const start = new Date(e.scheduledAt).getTime()
+    const end = new Date(e.endsAt).getTime()
+
+    if (Number.isNaN(start) || Number.isNaN(end)) return fromBackend || 'upcoming'
+
+    const computed = now < start ? 'upcoming' : now <= end ? 'live' : 'completed'
+
+    if (import.meta.env.DEV || (typeof window !== 'undefined' && window.localStorage?.getItem('debugExamTime') === '1')) {
+        console.log('[ExamCard]', e.id, {
+            now: new Date(now).toISOString(),
+            start: e.scheduledAt,
+            end: e.endsAt,
+            computed,
+            fromBackend
+        })
+    }
+
+    return computed
+}
+
 export default function ExamList() {
     const [filter, setFilter] = useState('all')
     const [search, setSearch] = useState('')
@@ -10,9 +36,15 @@ export default function ExamList() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [resultModal, setResultModal] = useState(null)
+    const [, setTick] = useState(0)
 
     useEffect(() => {
         fetchExams()
+    }, [])
+
+    useEffect(() => {
+        const id = setInterval(() => setTick((t) => t + 1), 30_000)
+        return () => clearInterval(id)
     }, [])
 
     const fetchExams = async () => {
@@ -77,7 +109,8 @@ export default function ExamList() {
     }
 
     const filtered = exams.filter(e => {
-        if (filter !== 'all' && e.status !== filter) return false
+        const status = computeStatus(e)
+        if (filter !== 'all' && status !== filter) return false
         if (search && !e.title.toLowerCase().includes(search.toLowerCase())) return false
         return true
     })
@@ -137,7 +170,9 @@ export default function ExamList() {
             </div>
 
             <div className="grid-3">
-                {filtered.map((exam, i) => (
+                {filtered.map((exam, i) => {
+                    const status = computeStatus(exam)
+                    return (
                     <div key={exam.id} className="glass-card" style={{ animationDelay: `${i * 0.05}s` }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                             <div>
@@ -149,8 +184,8 @@ export default function ExamList() {
                                 </p>
                             </div>
 
-                            <span className={`badge badge-${exam.status}`}>
-                                {exam.status}
+                            <span className={`badge badge-${status}`}>
+                                {status}
                             </span>
                         </div>
 
@@ -171,9 +206,9 @@ export default function ExamList() {
 
                         <div className="progress-bar" style={{ marginBottom: 12 }}>
                             <div
-                                className={`fill ${exam.hasResult ? 'green' : exam.status === 'live' ? 'blue' : 'orange'}`}
+                                className={`fill ${exam.hasResult ? 'green' : status === 'live' ? 'blue' : 'orange'}`}
                                 style={{
-                                    width: exam.hasResult ? '100%' : exam.status === 'live' ? '60%' : '10%'
+                                    width: exam.hasResult ? '100%' : status === 'live' ? '60%' : '10%'
                                 }}
                             />
                         </div>
@@ -199,7 +234,7 @@ export default function ExamList() {
                             >
                                 <BarChart size={16} /> View Result
                             </button>
-                        ) : exam.status === 'live' ? (
+                        ) : status === 'live' ? (
                             <Link
                                 to={`/exam/${exam.id}`}
                                 className="btn btn-primary"
@@ -207,7 +242,7 @@ export default function ExamList() {
                             >
                                 <Rocket size={16} /> Start Exam
                             </Link>
-                        ) : exam.status === 'upcoming' ? (
+                        ) : status === 'upcoming' ? (
                             <button
                                 className="btn btn-secondary"
                                 style={{ width: '100%', justifyContent: 'center' }}
@@ -225,7 +260,8 @@ export default function ExamList() {
                             </button>
                         )}
                     </div>
-                ))}
+                    )
+                })}
             </div>
 
             {!loading && filtered.length === 0 && !error && (

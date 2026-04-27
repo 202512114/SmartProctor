@@ -1,9 +1,15 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils import token_required
 from bson import ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 exam_bp = Blueprint("exam_bp", __name__)
+
+try:
+    IST = ZoneInfo("Asia/Kolkata")
+except ZoneInfoNotFoundError:
+    IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def next_id(collection, prefix, field_name):
@@ -34,7 +40,11 @@ def parse_datetime(date_value):
         return None
 
     if isinstance(date_value, datetime):
-        return date_value
+        return (
+            date_value.astimezone(timezone.utc)
+            if date_value.tzinfo
+            else date_value.replace(tzinfo=timezone.utc)
+        )
 
     value = str(date_value).strip()
     if not value:
@@ -42,11 +52,12 @@ def parse_datetime(date_value):
 
     try:
         if value.endswith("Z"):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            value = value[:-1] + "+00:00"
         dt = datetime.fromisoformat(value)
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt
+            # Legacy naive value -> interpret as IST wall clock, normalize to UTC
+            return dt.replace(tzinfo=IST).astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
         pass
 
@@ -60,11 +71,17 @@ def parse_datetime(date_value):
     for fmt in formats:
         try:
             dt = datetime.strptime(value, fmt)
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=IST).astimezone(timezone.utc)
         except Exception:
             continue
 
     return None
+
+
+def to_utc_iso(dt):
+    if not dt:
+        return ""
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def calculate_status(scheduled_at, duration_minutes):
@@ -81,14 +98,27 @@ def calculate_status(scheduled_at, duration_minutes):
         minutes = 30
 
     end_time = start_time + timedelta(minutes=minutes)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if now < start_time:
-        return "upcoming"
+        status = "upcoming"
     elif start_time <= now <= end_time:
-        return "live"
+        status = "live"
     else:
-        return "completed"
+        status = "completed"
+
+    try:
+        current_app.logger.info(
+            "EXAM_STATUS now=%s start=%s end=%s status=%s",
+            now.isoformat(),
+            start_time.isoformat(),
+            end_time.isoformat(),
+            status,
+        )
+    except Exception:
+        pass
+
+    return status
 
 
 def get_logged_in_admin(db, current_user):
@@ -288,6 +318,8 @@ def create_exam():
         if not parsed_scheduled:
             return jsonify({"message": "Invalid scheduled date and time"}), 400
 
+        scheduled_at_utc_iso = to_utc_iso(parsed_scheduled)
+
         if not isinstance(questions, list) or len(questions) == 0:
             return jsonify({"message": "At least one question is required"}), 400
 
@@ -326,7 +358,7 @@ def create_exam():
             })
 
         exam_id = next_id("exams", "E", "exam_id")
-        status = calculate_status(scheduled_at, duration_minutes)
+        status = calculate_status(scheduled_at_utc_iso, duration_minutes)
 
         exam_doc = {
             "exam_id": exam_id,
@@ -334,7 +366,7 @@ def create_exam():
             "subject": subject,
             "duration_minutes": duration_minutes,
             "total_marks": total_marks,
-            "scheduled_at": scheduled_at,
+            "scheduled_at": scheduled_at_utc_iso,
             "created_by": admin_info.get("admin_id"),
             "status": status
         }
@@ -421,6 +453,8 @@ def update_exam(exam_id):
         if not parsed_scheduled:
             return jsonify({"message": "Invalid scheduled date and time"}), 400
 
+        scheduled_at_utc_iso = to_utc_iso(parsed_scheduled)
+
         if not isinstance(questions, list) or len(questions) == 0:
             return jsonify({"message": "At least one question is required"}), 400
 
@@ -458,7 +492,7 @@ def update_exam(exam_id):
                 "marks": marks
             })
 
-        status = calculate_status(scheduled_at, duration_minutes)
+        status = calculate_status(scheduled_at_utc_iso, duration_minutes)
 
         db.exams.update_one(
             get_exam_owner_filter(admin_info, exam_id),
@@ -468,7 +502,7 @@ def update_exam(exam_id):
                     "subject": subject,
                     "duration_minutes": duration_minutes,
                     "total_marks": total_marks,
-                    "scheduled_at": scheduled_at,
+                    "scheduled_at": scheduled_at_utc_iso,
                     "status": status
                 }
             }
