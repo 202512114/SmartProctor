@@ -41,7 +41,12 @@ def parse_datetime(date_value):
         return None
 
     try:
-        return datetime.fromisoformat(value.replace("Z", ""))
+        if value.endswith("Z"):
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
     except Exception:
         pass
 
@@ -54,7 +59,8 @@ def parse_datetime(date_value):
 
     for fmt in formats:
         try:
-            return datetime.strptime(value, fmt)
+            dt = datetime.strptime(value, fmt)
+            return dt.replace(tzinfo=timezone.utc)
         except Exception:
             continue
 
@@ -75,7 +81,7 @@ def calculate_status(scheduled_at, duration_minutes):
         minutes = 30
 
     end_time = start_time + timedelta(minutes=minutes)
-    now = datetime.now()
+    now = datetime.utcnow()
 
     if now < start_time:
         return "upcoming"
@@ -354,7 +360,7 @@ def create_exam():
             "notif_id": notif_id,
             "exam_id": exam_id,
             "message": f"New exam '{title}' has been created.",
-            "sent_at": datetime.now().isoformat(),
+            "sent_at": datetime.utcnow().isoformat(),
             "is_read": False
         })
 

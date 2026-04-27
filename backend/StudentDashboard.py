@@ -30,7 +30,7 @@ def get_exam_status(scheduled_at, duration_minutes):
         duration = 30
 
     end_time = start_time + timedelta(minutes=duration)
-    now = datetime.now()
+    now = datetime.utcnow()
 
     if now < start_time:
         return "upcoming"
@@ -96,7 +96,7 @@ def is_today(value):
     if not dt:
         return False
 
-    return dt.date() == datetime.now().date()
+    return dt.date() == datetime.utcnow().date()
 
 
 def format_time(value):
@@ -142,7 +142,7 @@ def get_today_logs_for_attempts(db, attempt_ids):
     for log in logs:
         detected_at = parse_datetime(log.get("detected_at"))
 
-        if detected_at and detected_at.date() == datetime.now().date():
+        if detected_at and detected_at.date() == datetime.utcnow().date():
             today_logs.append(log)
 
     return today_logs

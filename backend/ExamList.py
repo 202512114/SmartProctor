@@ -49,7 +49,7 @@ def get_exam_status(scheduled_at, duration_minutes):
         duration = 30
 
     end_time = start_time + timedelta(minutes=duration)
-    now = datetime.now()
+    now = datetime.utcnow()
 
     if now < start_time:
         return "upcoming"
@@ -126,7 +126,7 @@ def get_or_create_attempt(db, exam_id, student_id):
         "attempt_id": attempt_id,
         "exam_id": exam_id,
         "student_id": student_id,
-        "start_time": datetime.now().isoformat(),
+        "start_time": datetime.utcnow().isoformat(),
         "end_time": "",
         "status": "started",
         "ip_address": request.remote_addr
@@ -291,7 +291,7 @@ def save_proctoring_warning(exam_id):
 
         event_type = data.get("event_type", "warning")
         severity = data.get("severity", "medium")
-        detected_at = data.get("detected_at") or datetime.now().isoformat()
+        detected_at = data.get("detected_at") or datetime.utcnow().isoformat()
         snapshot_url = data.get("snapshot_url", "")
         message = data.get("message", event_type)
 
@@ -314,7 +314,7 @@ def save_proctoring_warning(exam_id):
             "attempt_id": attempt_id,
             "student_id": student_id,
             "message": message,
-            "sent_at": datetime.now().isoformat(),
+            "sent_at": datetime.utcnow().isoformat(),
             "is_read": False
         })
 
@@ -363,7 +363,7 @@ def submit_exam(exam_id):
             {"attempt_id": attempt_id},
             {
                 "$set": {
-                    "end_time": datetime.now().isoformat(),
+                    "end_time": datetime.utcnow().isoformat(),
                     "status": "completed",
                     "ip_address": request.remote_addr
                 }
@@ -404,7 +404,7 @@ def submit_exam(exam_id):
                 "question_id": question_id,
                 "selected_option": selected_option,
                 "is_correct": is_correct,
-                "answered_at": datetime.now().isoformat()
+                "answered_at": datetime.utcnow().isoformat()
             })
 
         exam_total_marks = int(exam.get("total_marks", 0) or 0)
@@ -419,7 +419,7 @@ def submit_exam(exam_id):
         grade = calculate_grade(percentage)
 
         result_id = next_id("results", "R", "result_id")
-        generated_at = datetime.now().isoformat()
+        generated_at = datetime.utcnow().isoformat()
 
         db.results.insert_one({
             "result_id": result_id,

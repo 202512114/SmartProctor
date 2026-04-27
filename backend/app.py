@@ -24,11 +24,32 @@ mongo = PyMongo(app)
 app.mongo = mongo
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    FRONTEND_URL,
+]
+
 CORS(
     app,
-    resources={r"/api/*": {"origins": "*"}},
+    resources={r"/api/*": {"origins": ALLOWED_ORIGINS}},
     supports_credentials=True
 )
+
+@app.after_request
+def after_request(response):
+    origin = request.headers.get("Origin")
+
+    if origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+
+    return response
 
 
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
