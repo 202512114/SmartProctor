@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bot, AlertTriangle, Eye } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 export default function Proctoring() {
     const [activityLogs, setActivityLogs] = useState([])
@@ -8,7 +9,7 @@ export default function Proctoring() {
     useEffect(() => {
         const token = localStorage.getItem("token")
 
-        fetch("http://127.0.0.1:5000/api/proctoring/", {
+        fetch(`${API_BASE_URL}/api/proctoring/`, {
             headers: {
                 Authorization: `Bearer ${token}`
             }

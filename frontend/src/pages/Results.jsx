@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BarChart, ClipboardList, FileText, TrendingUp, AlertTriangle, CheckCircle, Users, Ban, Armchair, RefreshCw } from '../components/Icons'
+import { API_BASE_URL } from '../config'
 
 const alertIcons = {
     multiple_faces: <Users size={14} />,
@@ -23,7 +24,7 @@ export default function Results() {
                 setLoading(true)
                 setError('')
 
-                const res = await fetch("http://127.0.0.1:5000/api/results/", {
+                const res = await fetch(`${API_BASE_URL}/api/results/`, {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
